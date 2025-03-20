@@ -1,153 +1,183 @@
 import java.util.ArrayList;
 
-
 public class Bill_Bingus implements IOthelloAI {
-    private static final int MAX_DEPTH = 6;
+    private static final int MAX_DEPTH = 8; // Maximum depth for Minimax search
+    private int currentPlayer; // Tracks the current player
+
     
     @Override
     public Position decideMove(GameState s) {
         return MiniMax(s, Integer.MIN_VALUE, Integer.MAX_VALUE, MAX_DEPTH);
     }
 
+    /**
+     * Initiates the Minimax algorithm with Alpha-Beta pruning.
+     * 
+     * @param s     The current game state.
+     * @param alpha The Alpha value for pruning.
+     * @param beta  The Beta value for pruning.
+     * @param depth The remaining search depth.
+     * @return The best move determined by the algorithm.
+     */
     public Position MiniMax(GameState s, int alpha, int beta, int depth) {
+        currentPlayer = s.getPlayerInTurn();
         Combo result = max_value(s, alpha, beta, depth);
         return result.p;
     }
 
+    /**
+     * Computes the maximum utility value for the current player.
+     * 
+     * @param s     The current game state.
+     * @param alpha The Alpha value for pruning.
+     * @param beta  The Beta value for pruning.
+     * @param depth The remaining search depth.
+     * @return A Combo object containing the best move and its utility.
+     */
     public Combo max_value(GameState s, int alpha, int beta, int depth) {
         if (s.isFinished()) {
             return new Combo(utility(s), null);
         }
-        if (depth == 0) {
+        if (depth == 0 || s.legalMoves().isEmpty()) {
             return new Combo(evaluation(s), null);
         }
-        if (s.legalMoves().isEmpty()) {
-            return new Combo(evaluation(s), null); // Or handle "pass" move if supported
-        }
+
         int v = Integer.MIN_VALUE;
-        Position bestMove = s.legalMoves().isEmpty() ? null : s.legalMoves().get(0);
+        Position bestMove = s.legalMoves().get(0);
 
-        
         for (Position a : s.legalMoves()) {
+            GameState nextState = new GameState(s.getBoard(), s.getPlayerInTurn());
+            nextState.insertToken(a);
 
-            GameState nextState = new GameState(s.getBoard(), s.getPlayerInTurn()); //copy game state
-
-            boolean validMove = nextState.insertToken(a);
-            // if (!validMove) continue; //skips invalid moves
-
-            Combo result = min_value(nextState, alpha, beta, depth-1);
+            Combo result = min_value(nextState, alpha, beta, depth - 1);
             if (result.util > v) {
                 v = result.util;
                 bestMove = a;
                 alpha = Math.max(alpha, v);
             }
-            if(v>=beta){
+            if (v >= beta) {
                 return new Combo(v, bestMove);
             }
         }
         return new Combo(v, bestMove);
     }
 
+    /**
+     * Computes the minimum utility value for the opponent.
+     * 
+     * @param s     The current game state.
+     * @param alpha The Alpha value for pruning.
+     * @param beta  The Beta value for pruning.
+     * @param depth The remaining search depth.
+     * @return A Combo object containing the best move and its utility.
+     */
     public Combo min_value(GameState s, int alpha, int beta, int depth) {
         if (s.isFinished()) {
             return new Combo(utility(s), null);
         }
-        if (depth == 0) {
+        if (depth == 0 || s.legalMoves().isEmpty()) {
             return new Combo(evaluation(s), null);
         }
-        int v = Integer.MAX_VALUE;
-        Position bestMove = s.legalMoves().isEmpty() ? null : s.legalMoves().get(0);
 
-        if (s.legalMoves().isEmpty()) {
-            return new Combo(evaluation(s), null); // Or handle "pass" move if supported
-        }
+        int v = Integer.MAX_VALUE;
+        Position bestMove = s.legalMoves().get(0);
+
         for (Position a : s.legalMoves()) {
-            if (a == null) continue; // Skip null moves
+            if (a == null) continue;
 
             GameState nextState = new GameState(s.getBoard(), s.getPlayerInTurn());
+            nextState.insertToken(a);
 
-            boolean validMove = nextState.insertToken(a);
-            if (!validMove) {
-                System.out.println("Invalid move: " + a);
-                continue;
-            } 
-
-            Combo result = max_value(nextState, alpha, beta, depth-1);
+            Combo result = max_value(nextState, alpha, beta, depth - 1);
             if (result.util < v) {
                 v = result.util;
                 bestMove = a;
                 beta = Math.min(beta, v);
             }
-            if(v<=alpha){
+            if (v <= alpha) {
                 return new Combo(v, bestMove);
             }
         }
         return new Combo(v, bestMove);
     }
 
-
-    //Calculate the evaluation of a given gameState
+    /**
+     * Evaluates the current game state based on token difference and corner control.
+     * 
+     * @param s The current game state.
+     * @return The heuristic evaluation score.
+     */
     public int evaluation(GameState s) {
         int size = s.getBoard().length;
         int[] tokenCounts = s.countTokens();
-        
-        int[][] board = s.getBoard(); //the current board
-        int currentPlayer = s.getPlayerInTurn(); //get the current player (who has a turn)
-        int opponent = (currentPlayer == 1) ? 2 : 1; //the opp 
-        int eval = tokenCounts[currentPlayer-1] - tokenCounts[opponent-1]; //base eval on token diff
-        
+        int[][] board = s.getBoard();
+        int opponent = (currentPlayer == 1) ? 2 : 1;
+
+        int eval = (tokenCounts[currentPlayer - 1] - tokenCounts[opponent - 1]) + 1;
+
         int[][] corners = {
-            {0,0}, {0,size-1}, {size-1,size-1}, {size-1,0}  //all the corner coords
+            {0, 0}, {0, size - 1}, {size - 1, size - 1}, {size - 1, 0}
         };
 
-        
-
         for (int[] corner : corners) {
-            int x = corner[0];
-            int y = corner[1];
-            if(board[x][y] == currentPlayer){ //if current player owns a corner
-                eval += 100; //reward 
-            } else if (board[x][y] == opponent){ //if opponent owns a corner
-                eval -= 100; //penalty 
-            } 
-        }
-
-        if(s.isFinished()){
-            if(tokenCounts[currentPlayer-1] > tokenCounts[opponent-1]){
-                return Integer.MAX_VALUE / 2; //big number to ensure win 
+            int x = corner[0], y = corner[1];
+            if (board[x][y] == currentPlayer) {
+                eval += 500; // Reward for owning a corner
+            } else if (board[x][y] == opponent) {
+                eval -= 500; // Penalty for opponent owning a corner
             }
-            else if(tokenCounts[currentPlayer-1] < tokenCounts[opponent-1]){
-                return Integer.MIN_VALUE / 2; //small number to avoid lo
-            }
-            return eval;
         }
 
         return eval;
     }
 
-    //calcualte the utility to see if you win or lose the game
+    /**
+     * Computes the utility value for a finished game state.
+     * 
+     * @param s The game state.
+     * @return A high positive value for a win, a high negative value for a loss,
+     *         and 0 for a draw.
+     */
     public int utility(GameState s) {
-        int currentPlayer = s.getPlayerInTurn(); //get the current player (who has a turn)
-        int opponent = (currentPlayer == 1) ? 2 : 1; //the opp 
+        int opponent = (currentPlayer == 1) ? 2 : 1;
+        int[] tokenCounts = s.countTokens();
+        int roundPenalty = getCurrentRound(s) * 100; // Penalty for longer games
 
-        int[] tokenCount = s.countTokens();
-        if (tokenCount[currentPlayer-1] > tokenCount[opponent-1]) {
-            return Integer.MAX_VALUE / 2; //big number to ensure win 
-        } else if (tokenCount[opponent-1] > tokenCount[currentPlayer-1]) {
-            return Integer.MIN_VALUE / 2; //small number to avoid lo
+        if (tokenCounts[currentPlayer - 1] > tokenCounts[opponent - 1]) {
+            return 10000 - roundPenalty; // Win reward
+        } else if (tokenCounts[currentPlayer - 1] < tokenCounts[opponent - 1]) {
+            return -10000 + roundPenalty; // Loss penalty
         }
         return 0;
     }
+
+    /**
+     * Retrieves the current round number based on the total number of placed tokens.
+     * 
+     * @param s The game state.
+     * @return The current round number.
+     */
+    public int getCurrentRound(GameState s) {
+        int[] tokenCounts = s.countTokens();
+        return tokenCounts[0] + tokenCounts[1] - 4;
+    }
 }
 
-
+/**
+ * A helper class to store a move and its associated utility value.
+ */
 class Combo {
-    public int util;
-    public Position p;
+    public int util; // Utility value
+    public Position p; // Corresponding move
 
-    public Combo(int util,Position p){
+    /**
+     * Constructs a Combo object.
+     * 
+     * @param util The utility value.
+     * @param p    The associated move.
+     */
+    public Combo(int util, Position p) {
         this.util = util;
         this.p = p;
     }
-
 }
