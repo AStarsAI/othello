@@ -1,10 +1,21 @@
 import java.util.ArrayList;
 
-public class Bill_Bingus implements IOthelloAI {
-    private static final int MAX_DEPTH = 8; // Maximum depth for Minimax search
+public class OthelloAIAStars implements IOthelloAI {
+    private static final int MAX_DEPTH = 9; // Maximum depth for Minimax search
     private int currentPlayer; // Tracks the current player
-
+    private ArrayList<Long>  timeAverage = new ArrayList<>();
     
+    public double average(ArrayList<Long> l) {
+        
+        long currentSum=0;
+
+        for (long e : l){
+            currentSum+=e;
+        }
+        double average = currentSum/(double) l.size();
+        return average;
+    }
+
     @Override
     public Position decideMove(GameState s) {
         return MiniMax(s, Integer.MIN_VALUE, Integer.MAX_VALUE, MAX_DEPTH);
@@ -21,7 +32,14 @@ public class Bill_Bingus implements IOthelloAI {
      */
     public Position MiniMax(GameState s, int alpha, int beta, int depth) {
         currentPlayer = s.getPlayerInTurn();
+        long startTime = System.currentTimeMillis();
         Combo result = max_value(s, alpha, beta, depth);
+        long endTime = System.currentTimeMillis();
+        long delta = (endTime-startTime);
+        timeAverage.add(delta);
+
+        System.out.println("current average time per move (ms): " +average(timeAverage));
+
         return result.p;
     }
 
